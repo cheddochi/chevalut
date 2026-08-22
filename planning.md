@@ -127,9 +127,12 @@
 - Cloudflare Worker 하나로 구성. **R2 바인딩**(`chevault` 버킷, `vault/` 접두사)으로 원본 md를
   읽고, **Hyperdrive 바인딩**으로 분석 결과를 PlanetScale Postgres(`chevalut2`)의 `summary_*`
   테이블에 저장한다. 별도 D1/KV 등 다른 저장소는 두지 않는다.
-- 문장 분리·태그·카테고리 생성은 **Cloudflare Workers AI**(`@cf/meta/llama-3.3-70b-instruct-fp8-fast`)
-  바인딩으로 처리한다. Workers AI는 계정당 일일 무료 뉴런 할당량이 있고, 다 쓰면 그날은
-  추가 분석이 막힌다(Paid 플랜으로 업그레이드하거나 다음 날 할당량 리셋을 기다려야 함).
+- 문장 분리·태그·카테고리 생성은 **Cloudflare Workers AI**(`@cf/meta/llama-3.1-8b-instruct-fp8`)
+  바인딩으로 처리한다. 처음엔 `llama-3.3-70b-instruct-fp8-fast`를 썼으나, 일일 무료 뉴런
+  할당량(10,000개)으로 볼트 159개를 이틀 연속 다 못 돌릴 만큼 단가가 비싸(출력 기준 8b-fp8의
+  약 7.9배) 8b 모델로 낮췄다 — 한국어 태그/카테고리 추출 수준에는 충분하다고 판단.
+  Workers AI는 계정당 일일 무료 뉴런 할당량이 있고, 다 쓰면 그날은 추가 분석이 막힌다(모델을
+  낮춰도 그날의 소진된 할당량 자체는 되돌아오지 않음 — Paid 플랜 업그레이드나 다음 날 리셋 필요).
 - 시스템 프롬프트에 개인정보(실명/차량번호/회사명) 가리기 지시를 포함해, 분석 시점에 바로
   가려진 상태로 문장·태그가 생성되게 한다. `POST /api/admin/wipe`로 기존 분석 결과를 전부
   지우고 재분석을 트리거할 수 있다(예: 프롬프트를 바꿔 예전 데이터를 새로 걸러 다시 만들 때).
@@ -187,7 +190,7 @@
 - R2 버킷: `chevault` / 접두사: `vault/` (실측 159개 md 파일, 7개 카테고리 폴더)
 - Hyperdrive 구성 이름: `planetscale-chevalut2-main-qacf` / ID: `d57e6622b4d843859f4adccf40a9135d`
 - 배포된 Worker 주소: `https://obsidian-summary-agent.cheddochi.workers.dev`
-- Workers AI 모델: `@cf/meta/llama-3.3-70b-instruct-fp8-fast`
+- Workers AI 모델: `@cf/meta/llama-3.1-8b-instruct-fp8`
 
 DB 연결 문자열, Access Key 등 자격 증명은 이 문서에 포함하지 않음 — 필요 시 Cloudflare/PlanetScale
 대시보드에서 직접 재확인한다.

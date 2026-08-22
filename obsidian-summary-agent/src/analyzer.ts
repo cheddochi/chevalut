@@ -1,6 +1,9 @@
 import type { Env, ParsedSentence } from './types';
 
-const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+// llama-3.3-70b-instruct-fp8-fast는 품질은 좋지만 뉴런 단가가 비싸(출력 기준 8b-fp8의 약 7.9배)
+// 하루 무료 할당량(10,000 뉴런)으로 볼트 전체(159개)를 다 못 돌리는 문제가 있어, 한국어 태그/카테고리
+// 추출 수준에는 충분한 8b 모델로 낮춰 할당량 안에서 더 많은 노트를 처리할 수 있게 했다.
+const MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8';
 const MAX_CONTENT_CHARS = 6000;
 
 const SYSTEM_PROMPT = `너는 개인 메모(옵시디언 노트)를 분석하는 도우미다.
