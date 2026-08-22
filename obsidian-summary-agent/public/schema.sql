@@ -3,6 +3,26 @@
 -- 원본 노트는 이미 있는 notes 테이블을 그대로 읽기 전용으로 쓰고,
 -- 이 프로젝트의 분석 결과만 summary_ 접두사 테이블에 저장한다
 -- (chevault-sync의 기존 tags 테이블 등과 이름이 겹치지 않도록 접두사를 붙임).
+--
+-- 0. chevault-sync의 notes 테이블 (원본 스키마, 아직 이 DB에 적용된 적이 없어 여기 포함시킴).
+--    summary_sources.note_id가 이 테이블을 참조하므로 먼저 존재해야 한다.
+--    chevault-sync Worker가 실제로 배포되어 채워 넣기 전까지는 빈 테이블 상태다.
+CREATE TABLE IF NOT EXISTS notes (
+    id              BIGSERIAL PRIMARY KEY,
+    path            TEXT NOT NULL UNIQUE,
+    title           TEXT NOT NULL,
+    category        TEXT NOT NULL,
+    folder_path     TEXT NOT NULL,
+    content         TEXT NOT NULL,
+    frontmatter     JSONB NOT NULL DEFAULT '{}'::jsonb,
+    r2_modified_at  TIMESTAMPTZ,
+    synced_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_category ON notes (category);
+CREATE INDEX IF NOT EXISTS idx_notes_folder_path ON notes (folder_path);
 
 -- 1. 분석 대상 소스 (DB에서 가져온 노트 1건, 또는 업로드/붙여넣기 1건)
 CREATE TABLE IF NOT EXISTS summary_sources (

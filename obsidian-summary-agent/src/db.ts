@@ -126,27 +126,67 @@ export async function upsertSourceAndSentences(
       `;
       const sentenceId = insertedSentence[0].id as number;
 
-      if (s.tags.length === 0) continue;
-
-      await tx`
-        INSERT INTO summary_tags (name)
-        SELECT unnest(${tx.array(s.tags)}::text[])
-        ON CONFLICT (name) DO NOTHING
-      `;
-      const tagRows = await tx`
-        SELECT id FROM summary_tags WHERE name = ANY(${tx.array(s.tags)}::text[])
-      `;
-      if (tagRows.length > 0) {
+      // Hyperdrive(fetch_types: false) 하에서는 sql.array() + ::text[] 캐스트가
+      // 제대로 된 배열 리터럴을 만들지 못해 "malformed array literal" 오류가 나서,
+      // 태그 개수가 적은 점(문장당 1~4개)을 고려해 배열 없이 태그별로 처리한다.
+      for (const tagName of s.tags) {
         await tx`
-          INSERT INTO summary_sentence_tags (sentence_id, tag_id)
-          SELECT ${sentenceId}, unnest(${tx.array(tagRows.map((r) => r.id as number))}::bigint[])
-          ON CONFLICT DO NOTHING
+          INSERT INTO summary_tags (name) VALUES (${tagName})
+          ON CONFLICT (name) DO NOTHING
         `;
+        const tagRow = await tx`SELECT id FROM summary_tags WHERE name = ${tagName}`;
+        if (tagRow.length > 0) {
+          await tx`
+            INSERT INTO summary_sentence_tags (sentence_id, tag_id)
+            VALUES (${sentenceId}, ${tagRow[0].id})
+            ON CONFLICT DO NOTHING
+          `;
+        }
       }
     }
 
     return { sourceId, sentenceCount: sentences.length };
   });
+}
+
+/**
+ * Hyperdrive 연결은 fetch_types:false라 배열 타입 자동 파싱이 꺼져 있어서,
+ * array_agg 결과가 JS 배열이 아니라 Postgres 배열 리터럴 문자열(예: `{a,"b c"}`)로 온다.
+ * 이를 직접 파싱한다.
+ */
+function parsePgTextArray(raw: unknown): string[] {
+  if (Array.isArray(raw)) return raw as string[]; // 혹시 이미 파싱되어 오는 경우 대비
+  if (typeof raw !== 'string') return [];
+
+  const inner = raw.trim().replace(/^\{/, '').replace(/\}$/, '');
+  if (inner === '') return [];
+
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i];
+    if (inQuotes) {
+      if (ch === '\\' && i + 1 < inner.length) {
+        current += inner[i + 1];
+        i++;
+      } else if (ch === '"') {
+        inQuotes = false;
+      } else {
+        current += ch;
+      }
+    } else if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      result.push(current);
+      current = '';
+    } else {
+      current += ch;
+    }
+  }
+  result.push(current);
+  return result.map((s) => s.trim()).filter(Boolean);
 }
 
 export async function listSentences(sql: postgres.Sql): Promise<SentenceRecord[]> {
@@ -168,7 +208,7 @@ export async function listSentences(sql: postgres.Sql): Promise<SentenceRecord[]
     text: row.text as string,
     category: row.category as string,
     createdAt: new Date(row.created_at as string).toISOString(),
-    tags: (row.tags as string[]) ?? [],
+    tags: parsePgTextArray(row.tags),
     source: {
       type: row.source_type as 'db' | 'manual',
       path: (row.note_path as string) ?? null,

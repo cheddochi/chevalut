@@ -1,6 +1,6 @@
 import type { Env, ParsedSentence } from './types';
 
-const MODEL = '@cf/meta/llama-3.1-8b-instruct';
+const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
 const MAX_CONTENT_CHARS = 6000;
 
 const SYSTEM_PROMPT = `너는 개인 메모(옵시디언 노트)를 분석하는 도우미다.
@@ -28,8 +28,12 @@ export async function analyzeContent(env: Env, content: string): Promise<ParsedS
     max_tokens: 2048,
   });
 
-  const raw = (result as { response?: string }).response ?? '';
-  return parseModelOutput(raw);
+  // 일부 Workers AI 모델은 출력이 JSON처럼 보이면 문자열이 아니라 이미 파싱된
+  // 배열/객체로 response를 채워준다. 문자열/사전파싱 배열 두 경우를 모두 처리한다.
+  const raw = (result as { response?: unknown }).response;
+  if (Array.isArray(raw)) return normalizeParsed(raw);
+  if (typeof raw === 'string') return parseModelOutput(raw);
+  return [];
 }
 
 function parseModelOutput(raw: string): ParsedSentence[] {
@@ -51,11 +55,17 @@ function parseModelOutput(raw: string): ParsedSentence[] {
   }
 
   if (!Array.isArray(parsed)) return [];
+  return normalizeParsed(parsed);
+}
 
+function normalizeParsed(parsed: unknown[]): ParsedSentence[] {
   return parsed
     .filter(
       (item): item is { sentence: string; tags?: unknown; category?: unknown } =>
-        !!item && typeof item.sentence === 'string' && item.sentence.trim().length > 0
+        !!item &&
+        typeof item === 'object' &&
+        typeof (item as { sentence?: unknown }).sentence === 'string' &&
+        ((item as { sentence: string }).sentence.trim().length > 0)
     )
     .map((item) => ({
       sentence: item.sentence.trim(),
