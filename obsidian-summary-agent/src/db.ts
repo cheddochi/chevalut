@@ -29,6 +29,22 @@ export async function wipeAllSummaryData(sql: postgres.Sql): Promise<void> {
   await sql`DELETE FROM summary_tags`;
 }
 
+/**
+ * 문장이 0개인 vault 소스만 골라 삭제한다. AI가 그때 형식이 깨진 응답을 내서
+ * "분석 완료(사건 없음)"로 잘못 기록된 노트를 다음 sync에서 다시 시도하게 하기 위함
+ * (실제로 사건이 없어서 0개인 것과 구분은 못 하지만, 재시도해도 비용이 크지 않다).
+ * 이미 문장이 있는 소스는 건드리지 않는다.
+ */
+export async function retryEmptyVaultSources(sql: postgres.Sql): Promise<number> {
+  const deleted = await sql`
+    DELETE FROM summary_sources
+    WHERE source_type = 'vault'
+      AND id NOT IN (SELECT DISTINCT source_id FROM summary_sentences)
+    RETURNING id
+  `;
+  return deleted.length;
+}
+
 export function openSql(env: Env) {
   return postgres(env.HYPERDRIVE.connectionString, {
     max: 5,

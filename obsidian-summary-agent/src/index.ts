@@ -8,6 +8,7 @@ import {
   getSourceMeta,
   applySchema,
   wipeAllSummaryData,
+  retryEmptyVaultSources,
 } from './db';
 import { analyzeContent } from './analyzer';
 import { buildTopology } from './topology';
@@ -29,6 +30,16 @@ export default {
         try {
           await wipeAllSummaryData(sql);
           return Response.json({ ok: true });
+        } finally {
+          await sql.end();
+        }
+      }
+
+      if (url.pathname === '/api/admin/retry-empty' && request.method === 'POST') {
+        const sql = openSql(env);
+        try {
+          const deletedCount = await retryEmptyVaultSources(sql);
+          return Response.json({ deletedCount });
         } finally {
           await sql.end();
         }

@@ -45,7 +45,10 @@ export async function analyzeContent(env: Env, content: string): Promise<ParsedS
   const raw = (result as { response?: unknown }).response;
   if (Array.isArray(raw)) return normalizeParsed(raw);
   if (typeof raw === 'string') return parseModelOutput(raw);
-  return [];
+
+  // response가 배열도 문자열도 아니면 예상 못한 응답 형태 — "사건 없음"으로 조용히
+  // 넘기지 말고 에러로 던져서 호출부(sync 루프)가 실패로 기록하고 다음 실행에서 재시도하게 한다.
+  throw new Error(`예상치 못한 AI 응답 형식: ${JSON.stringify(raw).slice(0, 200)}`);
 }
 
 function parseModelOutput(raw: string): ParsedSentence[] {
@@ -57,16 +60,24 @@ function parseModelOutput(raw: string): ParsedSentence[] {
 
   const start = cleaned.indexOf('[');
   const end = cleaned.lastIndexOf(']');
-  if (start === -1 || end === -1 || end < start) return [];
+  if (start === -1 || end === -1 || end < start) {
+    // 배열 형태 JSON을 아예 못 찾았다 — 모델이 "사건 없음"이라고 판단한 게 아니라
+    // 형식이 깨진 출력을 낸 것이므로, 에러로 던져서 다음 sync 실행에서 재시도되게 한다.
+    throw new Error(`JSON 배열을 찾지 못함: ${cleaned.slice(0, 200)}`);
+  }
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(cleaned.slice(start, end + 1));
-  } catch {
-    return [];
+  } catch (err) {
+    throw new Error(
+      `JSON 파싱 실패: ${err instanceof Error ? err.message : String(err)} — ${cleaned.slice(0, 200)}`
+    );
   }
 
-  if (!Array.isArray(parsed)) return [];
+  if (!Array.isArray(parsed)) {
+    throw new Error(`JSON이 배열이 아님: ${cleaned.slice(0, 200)}`);
+  }
   return normalizeParsed(parsed);
 }
 
