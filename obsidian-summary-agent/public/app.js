@@ -191,37 +191,62 @@ function renderList(sentences) {
 
 // ============ 동기화 / 수동 분석 ============
 
-document.getElementById('syncBtn').addEventListener('click', async () => {
+/** /api/sync를 remaining이 0이 될 때까지 반복 호출한다. 진행 상황은 listStatus에 표시. */
+async function runSyncLoop(label) {
   let totalAnalyzed = 0;
   let totalSentences = 0;
   let totalErrors = 0;
 
-  try {
-    while (true) {
+  while (true) {
+    listStatus.textContent =
+      `${label} 중... (지금까지 분석 ${totalAnalyzed}건, 생성된 문장 ${totalSentences}개)`;
+
+    const res = await fetch('/api/sync', { method: 'POST' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `서버 오류 (${res.status})`);
+
+    totalAnalyzed += data.notesAnalyzed;
+    totalSentences += data.sentencesCreated;
+    totalErrors += data.errors.length;
+
+    if (data.remaining <= 0) {
       listStatus.textContent =
-        `동기화된 노트를 분석하는 중... (지금까지 분석 ${totalAnalyzed}건, 생성된 문장 ${totalSentences}개)`;
-
-      const res = await fetch('/api/sync', { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `서버 오류 (${res.status})`);
-
-      totalAnalyzed += data.notesAnalyzed;
-      totalSentences += data.sentencesCreated;
-      totalErrors += data.errors.length;
-
-      if (data.remaining <= 0) {
-        listStatus.textContent =
-          `완료 — 총 검사 ${data.notesChecked}건 / 분석 ${totalAnalyzed}건 / ` +
-          `건너뜀(중복) ${data.notesSkipped}건 / 생성된 문장 ${totalSentences}개` +
-          (totalErrors ? ` / 오류 ${totalErrors}건` : '');
-        break;
-      }
+        `완료 — 총 검사 ${data.notesChecked}건 / 분석 ${totalAnalyzed}건 / ` +
+        `건너뜀(중복) ${data.notesSkipped}건 / 생성된 문장 ${totalSentences}개` +
+        (totalErrors ? ` / 오류 ${totalErrors}건` : '');
+      break;
     }
-    await loadTags();
-    if (state.selectedTag) await loadSentencesForTag(state.selectedTag);
-    if (currentView === 'topology') await fetchTopology();
+  }
+
+  await loadTags();
+  if (state.selectedTag) await loadSentencesForTag(state.selectedTag);
+  if (currentView === 'topology') await fetchTopology();
+}
+
+document.getElementById('syncBtn').addEventListener('click', async () => {
+  try {
+    await runSyncLoop('새로/변경된 노트를 분석하는');
   } catch (err) {
     listStatus.textContent = `분석 실행 실패: ${err.message}`;
+  }
+});
+
+document.getElementById('forceResyncBtn').addEventListener('click', async () => {
+  const confirmed = confirm(
+    '지금까지 분석된 모든 문장/태그를 지우고, 볼트 전체를 처음부터 다시 분석합니다.\n' +
+      'Workers AI 할당량을 많이 소모할 수 있습니다. 계속할까요?'
+  );
+  if (!confirmed) return;
+
+  try {
+    listStatus.textContent = '기존 분석 결과를 삭제하는 중...';
+    const wipeRes = await fetch('/api/admin/wipe', { method: 'POST' });
+    const wipeData = await wipeRes.json();
+    if (!wipeRes.ok) throw new Error(wipeData.error || `서버 오류 (${wipeRes.status})`);
+
+    await runSyncLoop('볼트 전체를 처음부터 재분석하는');
+  } catch (err) {
+    listStatus.textContent = `전체 재분석 실패: ${err.message}`;
   }
 });
 
