@@ -150,3 +150,17 @@ PlanetScale Postgres에 자동으로 동기화되어 쌓이고 있다. 이 프�
 - 데이터가 유실되거나 중복 저장되지 않는지.
 - 실제 동기화된 볼트 전체 노트 수 기준으로 자동 분석이 합리적인 시간 안에 끝나는지,
   Hyperdrive 조회량이 많아졌을 때도 안정적으로 동작하는지.
+
+---
+
+## 참고 — 인프라 식별자
+
+9번에서 언급한 Hyperdrive 연결에 실제로 사용할 값. Cloudflare 대시보드
+(Storage & Databases → Postgres 및 MySQL(Hyperdrive))에서 확인함.
+
+- Hyperdrive 구성 이름: `planetscale-chevalut2-main-qacf`
+- Hyperdrive 구성 ID: `d57e6622b4d843859f4adccf40a9135d`
+- Worker 코드 작성 시 `wrangler.jsonc`의 `hyperdrive[0].id`에 위 구성 ID를 넣어 바인딩한다.
+
+DB 연결 문자열, Access Key 등 자격 증명은 이 문서에 포함하지 않음 — 필요 시 Cloudflare/PlanetScale
+대시보드에서 직접 재확인한다.
