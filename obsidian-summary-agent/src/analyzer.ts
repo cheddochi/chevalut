@@ -4,7 +4,9 @@ import type { Env, ParsedSentence } from './types';
 // 하루 무료 할당량(10,000 뉴런)으로 볼트 전체(159개)를 다 못 돌리는 문제가 있어, 한국어 태그/카테고리
 // 추출 수준에는 충분한 8b 모델로 낮춰 할당량 안에서 더 많은 노트를 처리할 수 있게 했다.
 const MODEL = '@cf/meta/llama-3.1-8b-instruct-fp8';
-const MAX_CONTENT_CHARS = 6000;
+// 8b 모델은 내용이 조밀한 긴 노트(회의록 등)에서 출력이 길어지면 Cloudflare 쪽에서
+// "Request timeout"이 나는 경우가 있어, 입력 길이를 줄여 요구되는 출력량 자체를 낮춘다.
+const MAX_CONTENT_CHARS = 3000;
 
 const SYSTEM_PROMPT = `너는 개인 메모(옵시디언 노트)를 분석하는 도우미다.
 주어진 노트 원문을 읽고, 그 안에 담긴 내용을 "단일 사건" 단위의 문장으로 나눠라.
@@ -37,7 +39,8 @@ export async function analyzeContent(env: Env, content: string): Promise<ParsedS
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: truncated },
     ],
-    max_tokens: 2048,
+    // 문장이 많은(내용이 조밀한) 노트는 2048 토큰으로 JSON 출력이 중간에 잘려 파싱 실패가 나서 올림.
+    max_tokens: 4096,
   });
 
   // 일부 Workers AI 모델은 출력이 JSON처럼 보이면 문자열이 아니라 이미 파싱된
