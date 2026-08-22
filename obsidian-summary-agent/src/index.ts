@@ -75,6 +75,16 @@ export default {
 
     return env.ASSETS.fetch(request);
   },
+
+  /**
+   * Cron 트리거: wrangler.jsonc의 triggers.crons에 따라 주기적으로 실행된다.
+   * Workers AI 일일 무료 뉴런 할당량을 다 써서 분석이 막혀 있어도, 이 스케줄이 계속 돌다가
+   * 할당량이 리셋되는 순간부터 사람이 버튼을 누르지 않아도 자동으로 나머지를 이어서 분석한다.
+   * 처리할 게 없으면(모두 최신 상태면) R2 목록 조회 정도만 하는 가벼운 호출이라 자주 돌려도 무리 없다.
+   */
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(runSyncBatch(env, DEFAULT_SYNC_LIMIT));
+  },
 } satisfies ExportedHandler<Env>;
 
 async function handleNoteContent(url: URL, env: Env): Promise<Response> {
@@ -134,6 +144,11 @@ async function handleSync(env: Env, request: Request): Promise<Response> {
   const limitParam = Number(url.searchParams.get('limit'));
   const limit = Number.isFinite(limitParam) && limitParam > 0 ? limitParam : DEFAULT_SYNC_LIMIT;
 
+  const summary = await runSyncBatch(env, limit);
+  return Response.json(summary);
+}
+
+async function runSyncBatch(env: Env, limit: number) {
   const summary = {
     notesChecked: 0,
     notesAnalyzed: 0,
@@ -198,7 +213,7 @@ async function handleSync(env: Env, request: Request): Promise<Response> {
     await sql.end();
   }
 
-  return Response.json(summary);
+  return summary;
 }
 
 async function handleManual(request: Request, env: Env): Promise<Response> {
