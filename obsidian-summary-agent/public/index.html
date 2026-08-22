@@ -51,6 +51,10 @@
       <button id="zoomInBtn" class="btn btn-secondary btn-sm" title="확대">＋</button>
       <button id="zoomOutBtn" class="btn btn-secondary btn-sm" title="축소">－</button>
       <button id="zoomResetBtn" class="btn btn-secondary btn-sm" title="화면에 맞추기">전체 보기</button>
+      <label class="gravity-control">
+        중력
+        <input type="range" id="gravitySlider" min="-500" max="-20" step="10" value="-160" />
+      </label>
     </div>
     <svg id="topologySvg"></svg>
     <aside id="topologyDetail" class="topology-detail hidden"></aside>

@@ -284,6 +284,8 @@ tabButtons.forEach((btn) => {
 // ============ 토폴로지 뷰 (d3-force + zoom/pan) ============
 
 let zoomBehavior = null;
+let currentTopologyData = null;
+let gravityStrength = -160;
 
 async function fetchTopology() {
   try {
@@ -291,11 +293,17 @@ async function fetchTopology() {
     const res = await fetch(`/api/topology${q}`);
     if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
     const data = await res.json();
+    currentTopologyData = data;
     renderTopology(data);
   } catch (err) {
     console.error('토폴로지 로딩 실패', err);
   }
 }
+
+document.getElementById('gravitySlider').addEventListener('input', (e) => {
+  gravityStrength = Number(e.target.value);
+  if (currentTopologyData) renderTopology(currentTopologyData);
+});
 
 function renderTopology(data) {
   const svgEl = document.getElementById('topologySvg');
@@ -328,7 +336,7 @@ function renderTopology(data) {
       'link',
       d3.forceLink(links).id((d) => d.id).distance(70).strength(0.6)
     )
-    .force('charge', d3.forceManyBody().strength(-160))
+    .force('charge', d3.forceManyBody().strength(gravityStrength))
     .force('center', d3.forceCenter(width / 2, height / 2))
     .force('collide', d3.forceCollide(26))
     .stop();
@@ -383,6 +391,8 @@ function renderTopology(data) {
   zoomBehavior = d3
     .zoom()
     .scaleExtent([0.1, 6])
+    // 마우스 휠 스크롤로는 확대/축소되지 않게 막는다 (버튼/드래그 이동은 그대로 허용).
+    .filter((event) => event.type !== 'wheel' && !event.button)
     .on('zoom', (event) => {
       g.attr('transform', event.transform);
     });

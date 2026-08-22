@@ -18,6 +18,17 @@ export async function applySchema(sql: postgres.Sql, schemaSqlText: string): Pro
   return statements.length;
 }
 
+/**
+ * 지금까지 분석된 결과(문장/태그/소스)를 전부 지운다. 사람이름·차량번호·회사이름을 걸러내지
+ * 못하던 예전 프롬프트로 생성된 데이터를 없애고, 다음 동기화(수동 또는 cron)에서 개인정보를
+ * 가리는 새 프롬프트로 처음부터 다시 분석하게 하기 위함. summary_sources를 지우면
+ * ON DELETE CASCADE로 summary_sentences/summary_sentence_tags도 함께 삭제된다.
+ */
+export async function wipeAllSummaryData(sql: postgres.Sql): Promise<void> {
+  await sql`DELETE FROM summary_sources`;
+  await sql`DELETE FROM summary_tags`;
+}
+
 export function openSql(env: Env) {
   return postgres(env.HYPERDRIVE.connectionString, {
     max: 5,

@@ -7,6 +7,7 @@ import {
   getTagStats,
   getSourceMeta,
   applySchema,
+  wipeAllSummaryData,
 } from './db';
 import { analyzeContent } from './analyzer';
 import { buildTopology } from './topology';
@@ -21,6 +22,16 @@ export default {
     try {
       if (url.pathname === '/api/admin/init-schema' && request.method === 'POST') {
         return await handleInitSchema(request, env);
+      }
+
+      if (url.pathname === '/api/admin/wipe' && request.method === 'POST') {
+        const sql = openSql(env);
+        try {
+          await wipeAllSummaryData(sql);
+          return Response.json({ ok: true });
+        } finally {
+          await sql.end();
+        }
       }
 
       if (url.pathname === '/api/sync' && request.method === 'POST') {
