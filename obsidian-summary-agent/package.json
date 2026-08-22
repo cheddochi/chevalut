@@ -1,0 +1,19 @@
+{
+  "name": "obsidian-summary-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "옵시디언 볼트(Hyperdrive 경유 Postgres)에서 md 노트를 읽어 단일 사건 문장/태그/카테고리로 분석하는 Cloudflare Worker",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:schema": "psql \"$PLANETSCALE_CONNECTION_STRING\" -f schema/schema.sql"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260822.1",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.125.0"
+  },
+  "dependencies": {
+    "postgres": "^3.4.9"
+  }
+}

@@ -1,0 +1,249 @@
+:root {
+  --bg: #1e1e1e;
+  --bg-card: #262626;
+  --bg-overlay: #161616;
+  --text: #dcddde;
+  --text-muted: #9a9a9a;
+  --border: #3a3a3a;
+  --purple: #7c3aed;
+  --purple-grad-a: #8a4fff;
+  --purple-grad-b: #b76bff;
+  --purple-light: #a48fff;
+  --tag-bg: #333333;
+  --font-sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: 1.65;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 32px;
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar h1 {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.btn {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  padding: 10px 18px;
+  border-radius: 9px;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--purple-grad-a), var(--purple-grad-b));
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.25);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover {
+  border-color: var(--purple-light);
+}
+
+.input-panel {
+  margin: 24px 32px;
+  padding: 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.input-panel h2 {
+  font-size: 16px;
+  margin: 0 0 4px;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 14px;
+}
+
+.input-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.input-row textarea {
+  flex: 1;
+  min-width: 240px;
+  min-height: 70px;
+  background: var(--bg-overlay);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  resize: vertical;
+}
+
+.input-row input[type='file'] {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.status-text {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 10px 32px 0;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 24px 32px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  padding: 10px 16px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-btn.active {
+  color: var(--text);
+  border-bottom-color: var(--purple);
+}
+
+.view {
+  padding: 20px 32px 40px;
+}
+
+.view.hidden {
+  display: none;
+}
+
+.sentence-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sentence-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.sentence-text {
+  font-size: 15px;
+  margin: 0 0 10px;
+}
+
+.sentence-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.badge-category {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.15);
+  color: #7dd3fc;
+}
+
+.tag-pill {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--tag-bg);
+  color: var(--purple-light);
+}
+
+.source-path {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+#topologyView {
+  position: relative;
+}
+
+#topologySvg {
+  width: 100%;
+  height: 640px;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.topology-detail {
+  position: absolute;
+  top: 32px;
+  right: 44px;
+  width: 280px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  font-size: 13px;
+}
+
+.topology-detail.hidden {
+  display: none;
+}
+
+.node-sentence {
+  fill: #888;
+}
+.node-sentence.selected {
+  fill: var(--purple-light);
+  filter: drop-shadow(0 0 6px var(--purple-light));
+}
+.node-tag {
+  fill: #4ade80;
+}
+.node-category {
+  fill: #38bdf8;
+}
+.edge-line {
+  stroke: #888;
+  stroke-opacity: 0.2;
+}
+.node-label {
+  fill: var(--text-muted);
+  font-size: 10px;
+  font-family: var(--font-sans);
+  pointer-events: none;
+}
