@@ -45,6 +45,21 @@ export async function retryEmptyVaultSources(sql: postgres.Sql): Promise<number>
   return deleted.length;
 }
 
+/** cron이 실제로 AI를 호출해도 되는지 여부. 설정 행이 아직 없으면 안전하게 꺼짐으로 취급한다. */
+export async function getAutoSyncEnabled(sql: postgres.Sql): Promise<boolean> {
+  const rows = await sql`SELECT auto_sync_enabled FROM app_settings WHERE id = 1`;
+  if (rows.length === 0) return false;
+  return Boolean(rows[0].auto_sync_enabled);
+}
+
+export async function setAutoSyncEnabled(sql: postgres.Sql, enabled: boolean): Promise<void> {
+  await sql`
+    INSERT INTO app_settings (id, auto_sync_enabled, updated_at)
+    VALUES (1, ${enabled}, now())
+    ON CONFLICT (id) DO UPDATE SET auto_sync_enabled = EXCLUDED.auto_sync_enabled, updated_at = now()
+  `;
+}
+
 export function openSql(env: Env) {
   return postgres(env.HYPERDRIVE.connectionString, {
     max: 5,

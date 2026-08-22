@@ -9,6 +9,8 @@ import {
   applySchema,
   wipeAllSummaryData,
   retryEmptyVaultSources,
+  getAutoSyncEnabled,
+  setAutoSyncEnabled,
 } from './db';
 import { analyzeContent } from './analyzer';
 import { buildTopology } from './topology';
@@ -88,6 +90,28 @@ export default {
       if (url.pathname === '/api/note-content' && request.method === 'GET') {
         return await handleNoteContent(url, env);
       }
+
+      if (url.pathname === '/api/settings' && request.method === 'GET') {
+        const sql = openSql(env);
+        try {
+          const autoSyncEnabled = await getAutoSyncEnabled(sql);
+          return Response.json({ autoSyncEnabled });
+        } finally {
+          await sql.end();
+        }
+      }
+
+      if (url.pathname === '/api/settings' && request.method === 'POST') {
+        const body = (await request.json()) as { autoSyncEnabled?: unknown };
+        const enabled = Boolean(body.autoSyncEnabled);
+        const sql = openSql(env);
+        try {
+          await setAutoSyncEnabled(sql, enabled);
+          return Response.json({ autoSyncEnabled: enabled });
+        } finally {
+          await sql.end();
+        }
+      }
     } catch (err) {
       return Response.json(
         { error: err instanceof Error ? err.message : String(err) },
@@ -99,15 +123,27 @@ export default {
   },
 
   /**
-   * Cron 트리거: wrangler.jsonc의 triggers.crons에 따라 주기적으로 실행된다.
-   * Workers AI 일일 무료 뉴런 할당량을 다 써서 분석이 막혀 있어도, 이 스케줄이 계속 돌다가
-   * 할당량이 리셋되는 순간부터 사람이 버튼을 누르지 않아도 자동으로 나머지를 이어서 분석한다.
-   * 처리할 게 없으면(모두 최신 상태면) R2 목록 조회 정도만 하는 가벼운 호출이라 자주 돌려도 무리 없다.
+   * Cron 트리거: wrangler.jsonc의 triggers.crons에 따라 10분마다 호출된다. Cloudflare cron
+   * 자체는 코드 재배포 없이 껐다 켰다 할 수 없어서, 대신 app_settings.auto_sync_enabled
+   * 값을 먼저 확인해 꺼져 있으면 AI 호출 없이 바로 끝낸다 (화면의 토글로 이 값을 조정).
    */
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(runSyncBatch(env, DEFAULT_SYNC_LIMIT));
+    ctx.waitUntil(runScheduledSyncIfEnabled(env));
   },
 } satisfies ExportedHandler<Env>;
+
+async function runScheduledSyncIfEnabled(env: Env): Promise<void> {
+  const checkSql = openSql(env);
+  let enabled: boolean;
+  try {
+    enabled = await getAutoSyncEnabled(checkSql);
+  } finally {
+    await checkSql.end();
+  }
+
+  if (!enabled) return;
+  await runSyncBatch(env, DEFAULT_SYNC_LIMIT);
+}
 
 async function handleNoteContent(url: URL, env: Env): Promise<Response> {
   const sourceIdParam = url.searchParams.get('sourceId');

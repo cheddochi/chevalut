@@ -250,6 +250,44 @@ document.getElementById('forceResyncBtn').addEventListener('click', async () => 
   }
 });
 
+// ============ 자동 동기화 on/off ============
+
+const autoSyncToggle = document.getElementById('autoSyncToggle');
+
+async function loadAutoSyncSetting() {
+  try {
+    const res = await fetch('/api/settings');
+    if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
+    const data = await res.json();
+    autoSyncToggle.checked = Boolean(data.autoSyncEnabled);
+  } catch (err) {
+    listStatus.textContent = `자동 동기화 설정을 불러오지 못했습니다: ${err.message}`;
+  }
+}
+
+autoSyncToggle.addEventListener('change', async () => {
+  const enabled = autoSyncToggle.checked;
+  autoSyncToggle.disabled = true;
+  try {
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ autoSyncEnabled: enabled }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `서버 오류 (${res.status})`);
+    autoSyncToggle.checked = Boolean(data.autoSyncEnabled);
+    listStatus.textContent = data.autoSyncEnabled
+      ? '자동 동기화를 켰습니다 (10분마다 새/변경된 노트를 분석합니다).'
+      : '자동 동기화를 껐습니다.';
+  } catch (err) {
+    autoSyncToggle.checked = !enabled;
+    listStatus.textContent = `자동 동기화 설정 변경 실패: ${err.message}`;
+  } finally {
+    autoSyncToggle.disabled = false;
+  }
+});
+
 document.getElementById('manualBtn').addEventListener('click', async () => {
   const fileInput = document.getElementById('fileInput');
   const pasteInput = document.getElementById('pasteInput');
@@ -557,3 +595,4 @@ document.getElementById('manualModal').addEventListener('click', (e) => {
 // ============ 초기 로드 ============
 
 loadTags();
+loadAutoSyncSetting();

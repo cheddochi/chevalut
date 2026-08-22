@@ -10,6 +10,10 @@
   <header class="topbar">
     <h1>Obsidian Summary Agent</h1>
     <div class="topbar-actions">
+      <label class="auto-sync-toggle" title="10분마다 자동으로 새/변경된 노트를 분석합니다">
+        <input type="checkbox" id="autoSyncToggle" />
+        자동 동기화
+      </label>
       <button id="openManualBtn" class="btn btn-secondary">개별 노트 분석</button>
       <button id="syncBtn" class="btn btn-primary">동기화된 노트 분석</button>
       <button id="forceResyncBtn" class="btn btn-secondary">전체 강제 재분석</button>

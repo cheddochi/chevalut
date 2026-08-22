@@ -53,6 +53,24 @@ body {
   gap: 10px;
 }
 
+.auto-sync-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 0 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.auto-sync-toggle input[type='checkbox'] {
+  accent-color: var(--purple);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 .btn {
   font-family: var(--font-sans);
   font-size: 14px;

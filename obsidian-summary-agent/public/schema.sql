@@ -55,3 +55,14 @@ CREATE TABLE IF NOT EXISTS summary_sentence_tags (
 );
 
 CREATE INDEX IF NOT EXISTS idx_summary_sentence_tags_tag ON summary_sentence_tags (tag_id);
+
+-- 4. 앱 설정 (자동 동기화 on/off 등) — 단일 행(id=1)만 사용.
+-- 10분마다 도는 cron 자체는 계속 실행되지만, 이 값이 false면 AI 호출 없이 그냥 넘어간다.
+CREATE TABLE IF NOT EXISTS app_settings (
+    id                 INT PRIMARY KEY DEFAULT 1,
+    auto_sync_enabled  BOOLEAN NOT NULL DEFAULT false,
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+INSERT INTO app_settings (id, auto_sync_enabled) VALUES (1, false)
+ON CONFLICT (id) DO NOTHING;
