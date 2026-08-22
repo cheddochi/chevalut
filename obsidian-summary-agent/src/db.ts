@@ -3,10 +3,14 @@ import type { Env, ParsedSentence, SourceNote, SentenceRecord } from './types';
 
 /** public/schema.sql을 세미콜론 단위로 나눠 순서대로 실행한다 (모든 문이 IF NOT EXISTS라 재실행해도 안전). */
 export async function applySchema(sql: postgres.Sql, schemaSqlText: string): Promise<number> {
-  const statements = schemaSqlText
+  // 줄 단위 "-- 주석"을 먼저 제거해야, 주석이 문(statement) 맨 앞에 붙어 있어도
+  // 그 뒤에 오는 실제 SQL(예: CREATE TABLE)까지 통째로 걸러지는 일이 없다.
+  const withoutComments = schemaSqlText.replace(/--[^\n]*/g, '');
+
+  const statements = withoutComments
     .split(';')
     .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith('--'));
+    .filter((s) => s.length > 0);
 
   for (const statement of statements) {
     await sql.unsafe(statement);
