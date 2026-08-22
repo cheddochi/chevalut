@@ -1,15 +1,151 @@
+const state = {
+  selectedTag: null,
+  tags: [],
+};
+let currentView = 'list';
+
 const listStatus = document.getElementById('listStatus');
 const manualStatus = document.getElementById('manualStatus');
 const sentenceList = document.getElementById('sentenceList');
+const tagListContainer = document.getElementById('tagListContainer');
+const tagSearchInput = document.getElementById('tagSearchInput');
+const suggestionsBox = document.getElementById('tagSuggestions');
+const selectedTagBar = document.getElementById('selectedTagBar');
+const selectedTagName = document.getElementById('selectedTagName');
 
-async function fetchSentences() {
-  listStatus.textContent = '불러오는 중...';
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str ?? '';
+  return div.innerHTML;
+}
+
+// ============ 태그 목록 + 검색 ============
+
+async function loadTags() {
+  listStatus.textContent = '태그 불러오는 중...';
   try {
-    const res = await fetch('/api/sentences');
+    const res = await fetch('/api/tags');
+    if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
+    state.tags = await res.json();
+    renderTagList(state.tags);
+    listStatus.textContent = `태그 ${state.tags.length}개`;
+  } catch (err) {
+    listStatus.textContent = `태그를 불러오지 못했습니다: ${err.message}`;
+  }
+}
+
+function renderTagList(tags) {
+  tagListContainer.innerHTML = '';
+  for (const t of tags) {
+    const row = document.createElement('div');
+    row.className = 'tag-row';
+    row.addEventListener('click', () => selectTag(t.name));
+
+    const name = document.createElement('span');
+    name.className = 'tag-row-name';
+    name.textContent = `#${t.name}`;
+
+    const count = document.createElement('span');
+    count.className = 'tag-row-count';
+    count.textContent = `${t.count}회`;
+
+    const related = document.createElement('div');
+    related.className = 'tag-row-related';
+    for (const r of t.related.slice(0, 6)) {
+      const chip = document.createElement('span');
+      chip.className = 'related-chip';
+      chip.textContent = `${r.name} · ${r.count}`;
+      related.appendChild(chip);
+    }
+
+    row.appendChild(name);
+    row.appendChild(count);
+    row.appendChild(related);
+    tagListContainer.appendChild(row);
+  }
+}
+
+tagSearchInput.addEventListener('input', () => {
+  const q = tagSearchInput.value.trim().toLowerCase();
+  if (!q) {
+    suggestionsBox.classList.add('hidden');
+    suggestionsBox.innerHTML = '';
+    return;
+  }
+  const matches = state.tags.filter((t) => t.name.toLowerCase().includes(q)).slice(0, 8);
+  if (matches.length === 0) {
+    suggestionsBox.classList.add('hidden');
+    suggestionsBox.innerHTML = '';
+    return;
+  }
+  suggestionsBox.innerHTML = '';
+  for (const m of matches) {
+    const item = document.createElement('div');
+    item.className = 'suggestion-item';
+    item.innerHTML = `<span>#${escapeHtml(m.name)}</span><span class="suggestion-count">${m.count}회</span>`;
+    item.addEventListener('click', () => {
+      suggestionsBox.classList.add('hidden');
+      selectTag(m.name);
+    });
+    suggestionsBox.appendChild(item);
+  }
+  suggestionsBox.classList.remove('hidden');
+});
+
+tagSearchInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const q = tagSearchInput.value.trim().toLowerCase();
+    if (q) {
+      const match =
+        state.tags.find((t) => t.name.toLowerCase() === q) ||
+        state.tags.find((t) => t.name.toLowerCase().includes(q));
+      if (match) selectTag(match.name);
+    }
+    suggestionsBox.classList.add('hidden');
+  } else if (e.key === 'Escape') {
+    suggestionsBox.classList.add('hidden');
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-box')) suggestionsBox.classList.add('hidden');
+});
+
+async function selectTag(name) {
+  state.selectedTag = name;
+  tagSearchInput.value = name;
+  suggestionsBox.classList.add('hidden');
+  selectedTagBar.classList.remove('hidden');
+  selectedTagName.textContent = `#${name}`;
+  tagListContainer.classList.add('hidden');
+  sentenceList.classList.remove('hidden');
+
+  await loadSentencesForTag(name);
+  if (currentView === 'topology') await fetchTopology();
+}
+
+function clearTagSelection() {
+  state.selectedTag = null;
+  tagSearchInput.value = '';
+  selectedTagBar.classList.add('hidden');
+  tagListContainer.classList.remove('hidden');
+  sentenceList.classList.add('hidden');
+  listStatus.textContent = `태그 ${state.tags.length}개`;
+  if (currentView === 'topology') fetchTopology();
+}
+
+document.getElementById('clearTagBtn').addEventListener('click', clearTagSelection);
+
+// ============ 문장 목록 (태그 선택 시) ============
+
+async function loadSentencesForTag(tag) {
+  listStatus.textContent = `#${tag} 관련 문장 불러오는 중...`;
+  try {
+    const res = await fetch(`/api/sentences?tag=${encodeURIComponent(tag)}`);
     if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
     const data = await res.json();
     renderList(data);
-    listStatus.textContent = `${data.length}개의 문장`;
+    listStatus.textContent = `#${tag} — 문장 ${data.length}개`;
   } catch (err) {
     listStatus.textContent = `목록을 불러오지 못했습니다: ${err.message}`;
   }
@@ -38,12 +174,14 @@ function renderList(sentences) {
       const pill = document.createElement('span');
       pill.className = 'tag-pill';
       pill.textContent = `#${tag}`;
+      pill.style.cursor = 'pointer';
+      pill.addEventListener('click', () => selectTag(tag));
       meta.appendChild(pill);
     }
 
     const source = document.createElement('span');
     source.className = 'source-path';
-    source.textContent = s.source.type === 'db' ? s.source.path : `${s.source.title} (붙여넣기)`;
+    source.textContent = s.source.type === 'vault' ? s.source.path : `${s.source.title} (붙여넣기)`;
     meta.appendChild(source);
 
     card.appendChild(meta);
@@ -51,17 +189,36 @@ function renderList(sentences) {
   }
 }
 
+// ============ 동기화 / 수동 분석 ============
+
 document.getElementById('syncBtn').addEventListener('click', async () => {
-  listStatus.textContent = '동기화된 노트를 분석하는 중... (노트 수에 따라 시간이 걸릴 수 있습니다)';
+  let totalAnalyzed = 0;
+  let totalSentences = 0;
+  let totalErrors = 0;
+
   try {
-    const res = await fetch('/api/sync', { method: 'POST' });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || `서버 오류 (${res.status})`);
-    listStatus.textContent =
-      `검사 ${data.notesChecked}건 / 분석 ${data.notesAnalyzed}건 / 건너뜀(중복) ${data.notesSkipped}건 / ` +
-      `생성된 문장 ${data.sentencesCreated}개` +
-      (data.errors.length ? ` / 오류 ${data.errors.length}건` : '');
-    await fetchSentences();
+    while (true) {
+      listStatus.textContent =
+        `동기화된 노트를 분석하는 중... (지금까지 분석 ${totalAnalyzed}건, 생성된 문장 ${totalSentences}개)`;
+
+      const res = await fetch('/api/sync', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `서버 오류 (${res.status})`);
+
+      totalAnalyzed += data.notesAnalyzed;
+      totalSentences += data.sentencesCreated;
+      totalErrors += data.errors.length;
+
+      if (data.remaining <= 0) {
+        listStatus.textContent =
+          `완료 — 총 검사 ${data.notesChecked}건 / 분석 ${totalAnalyzed}건 / ` +
+          `건너뜀(중복) ${data.notesSkipped}건 / 생성된 문장 ${totalSentences}개` +
+          (totalErrors ? ` / 오류 ${totalErrors}건` : '');
+        break;
+      }
+    }
+    await loadTags();
+    if (state.selectedTag) await loadSentencesForTag(state.selectedTag);
     if (currentView === 'topology') await fetchTopology();
   } catch (err) {
     listStatus.textContent = `분석 실행 실패: ${err.message}`;
@@ -93,15 +250,16 @@ document.getElementById('manualBtn').addEventListener('click', async () => {
     manualStatus.textContent = `문장 ${data.sentenceCount}개 생성 완료`;
     fileInput.value = '';
     pasteInput.value = '';
-    await fetchSentences();
+    await loadTags();
+    if (state.selectedTag) await loadSentencesForTag(state.selectedTag);
     if (currentView === 'topology') await fetchTopology();
   } catch (err) {
     manualStatus.textContent = `분석 실패: ${err.message}`;
   }
 });
 
-// --- 탭 전환 ---
-let currentView = 'list';
+// ============ 탭 전환 ============
+
 const tabButtons = document.querySelectorAll('.tab-btn');
 const listView = document.getElementById('listView');
 const topologyView = document.getElementById('topologyView');
@@ -123,10 +281,14 @@ tabButtons.forEach((btn) => {
   });
 });
 
-// --- 토폴로지 뷰 (d3-force) ---
+// ============ 토폴로지 뷰 (d3-force + zoom/pan) ============
+
+let zoomBehavior = null;
+
 async function fetchTopology() {
   try {
-    const res = await fetch('/api/topology');
+    const q = state.selectedTag ? `?tag=${encodeURIComponent(state.selectedTag)}` : '';
+    const res = await fetch(`/api/topology${q}`);
     if (!res.ok) throw new Error(`서버 오류 (${res.status})`);
     const data = await res.json();
     renderTopology(data);
@@ -136,52 +298,77 @@ async function fetchTopology() {
 }
 
 function renderTopology(data) {
-  const svg = d3.select('#topologySvg');
+  const svgEl = document.getElementById('topologySvg');
+  const svg = d3.select(svgEl);
   svg.selectAll('*').remove();
+  document.getElementById('topologyDetail').classList.add('hidden');
 
-  const width = svg.node().clientWidth || 800;
-  const height = svg.node().clientHeight || 640;
+  const width = svgEl.clientWidth || 800;
+  const height = svgEl.clientHeight || 720;
+  svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+  const g = svg.append('g').attr('class', 'zoom-layer');
 
   const nodes = data.nodes.map((n) => ({ ...n }));
   const links = data.edges.map((e) => ({ ...e }));
+
+  if (nodes.length === 0) {
+    g.append('text')
+      .attr('x', width / 2)
+      .attr('y', height / 2)
+      .attr('text-anchor', 'middle')
+      .attr('class', 'node-label')
+      .text('표시할 데이터가 없습니다.');
+    return;
+  }
 
   const simulation = d3
     .forceSimulation(nodes)
     .force(
       'link',
-      d3
-        .forceLink(links)
-        .id((d) => d.id)
-        .distance(60)
+      d3.forceLink(links).id((d) => d.id).distance(70).strength(0.6)
     )
-    .force('charge', d3.forceManyBody().strength(-120))
+    .force('charge', d3.forceManyBody().strength(-160))
     .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('collide', d3.forceCollide(18));
+    .force('collide', d3.forceCollide(26))
+    .stop();
 
-  const link = svg
-    .append('g')
-    .selectAll('line')
-    .data(links)
-    .join('line')
-    .attr('class', 'edge-line');
+  // 화면에 뜨자마자 이미 안정된 배치로 보이도록, 애니메이션 없이 미리 여러 틱을 돌려 수렴시킨다.
+  const preTicks = Math.min(400, 150 + nodes.length);
+  for (let i = 0; i < preTicks; i++) simulation.tick();
 
-  const node = svg
+  const link = g.append('g').selectAll('line').data(links).join('line').attr('class', 'edge-line');
+
+  const node = g
     .append('g')
     .selectAll('circle')
     .data(nodes)
     .join('circle')
     .attr('r', (d) => (d.type === 'sentence' ? 6 : 9))
     .attr('class', (d) => `node-${d.type}`)
-    .call(drag(simulation))
-    .on('click', (_event, d) => showDetail(d));
+    .attr('cx', (d) => d.x)
+    .attr('cy', (d) => d.y)
+    .call(dragBehavior(simulation))
+    .on('click', (event, d) => {
+      event.stopPropagation();
+      onNodeClick(d, nodes, links);
+    });
 
-  const label = svg
+  const label = g
     .append('g')
     .selectAll('text')
     .data(nodes)
     .join('text')
     .attr('class', 'node-label')
-    .text((d) => (d.label.length > 20 ? d.label.slice(0, 20) + '…' : d.label));
+    .attr('x', (d) => d.x + 10)
+    .attr('y', (d) => d.y + 4)
+    .text((d) => (d.label.length > 28 ? d.label.slice(0, 28) + '…' : d.label));
+
+  link
+    .attr('x1', (d) => d.source.x)
+    .attr('y1', (d) => d.source.y)
+    .attr('x2', (d) => d.target.x)
+    .attr('y2', (d) => d.target.y);
 
   simulation.on('tick', () => {
     link
@@ -189,32 +376,91 @@ function renderTopology(data) {
       .attr('y1', (d) => d.source.y)
       .attr('x2', (d) => d.target.x)
       .attr('y2', (d) => d.target.y);
-
     node.attr('cx', (d) => d.x).attr('cy', (d) => d.y);
     label.attr('x', (d) => d.x + 10).attr('y', (d) => d.y + 4);
   });
+
+  zoomBehavior = d3
+    .zoom()
+    .scaleExtent([0.1, 6])
+    .on('zoom', (event) => {
+      g.attr('transform', event.transform);
+    });
+  svg.call(zoomBehavior);
+
+  fitToView(svg, nodes, width, height);
+
+  document.getElementById('zoomInBtn').onclick = () => svg.transition().duration(200).call(zoomBehavior.scaleBy, 1.3);
+  document.getElementById('zoomOutBtn').onclick = () =>
+    svg.transition().duration(200).call(zoomBehavior.scaleBy, 1 / 1.3);
+  document.getElementById('zoomResetBtn').onclick = () => fitToView(svg, nodes, width, height);
 }
 
-function showDetail(d) {
+function fitToView(svg, nodes, width, height) {
+  if (!zoomBehavior || nodes.length === 0) return;
+  const padding = 60;
+  const xs = nodes.map((n) => n.x);
+  const ys = nodes.map((n) => n.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const boxW = Math.max(maxX - minX, 1);
+  const boxH = Math.max(maxY - minY, 1);
+  const scale = Math.min((width - padding * 2) / boxW, (height - padding * 2) / boxH, 3);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const transform = d3.zoomIdentity.translate(width / 2, height / 2).scale(scale).translate(-cx, -cy);
+  svg.transition().duration(300).call(zoomBehavior.transform, transform);
+}
+
+function onNodeClick(d, nodes, links) {
   const detail = document.getElementById('topologyDetail');
   detail.classList.remove('hidden');
+
   if (d.type === 'sentence') {
-    detail.innerHTML = `<strong>문장</strong><p>${escapeHtml(d.label)}</p>
-      <p style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono);">
-        ${d.source ? (d.source.type === 'db' ? escapeHtml(d.source.path) : escapeHtml(d.source.title)) : ''}
-      </p>`;
-  } else {
-    detail.innerHTML = `<strong>${d.type === 'tag' ? '태그' : '카테고리'}</strong><p>${escapeHtml(d.label)}</p>`;
+    detail.innerHTML = `
+      <h4>문장</h4>
+      <p>${escapeHtml(d.label)}</p>
+      <p style="color:var(--text-muted);font-size:11px;font-family:var(--font-mono);margin-bottom:12px;">
+        ${d.source.type === 'vault' ? escapeHtml(d.source.path) : escapeHtml(d.source.title)}
+      </p>
+    `;
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary btn-sm';
+    btn.textContent = '노트 전체 보기';
+    btn.addEventListener('click', () => openNoteModal(d.source.id, d.source.title));
+    detail.appendChild(btn);
+    return;
+  }
+
+  // 태그/카테고리 노드: 연결된 문장을 통해 관련 노트 목록을 구성한다.
+  const relatedSentenceIds = new Set(
+    links.filter((l) => l.target.id === d.id).map((l) => l.source.id)
+  );
+  const relatedSentenceNodes = nodes.filter((n) => n.type === 'sentence' && relatedSentenceIds.has(n.id));
+
+  const notesById = new Map();
+  for (const n of relatedSentenceNodes) {
+    if (!notesById.has(n.source.id)) notesById.set(n.source.id, n.source);
+  }
+  const notes = Array.from(notesById.values());
+
+  detail.innerHTML = `
+    <h4>${d.type === 'tag' ? '태그' : '카테고리'}: ${escapeHtml(d.label)}</h4>
+    <p style="color:var(--text-muted);font-size:12px;margin-bottom:10px;">관련 노트 ${notes.length}건</p>
+  `;
+
+  for (const note of notes) {
+    const btn = document.createElement('button');
+    btn.className = 'related-note-item';
+    btn.textContent = note.type === 'vault' ? note.path : `${note.title} (붙여넣기)`;
+    btn.addEventListener('click', () => openNoteModal(note.id, note.title));
+    detail.appendChild(btn);
   }
 }
 
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str ?? '';
-  return div.innerHTML;
-}
-
-function drag(simulation) {
+function dragBehavior(simulation) {
   function dragstarted(event, d) {
     if (!event.active) simulation.alphaTarget(0.3).restart();
     d.fx = d.x;
@@ -232,4 +478,35 @@ function drag(simulation) {
   return d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended);
 }
 
-fetchSentences();
+// ============ 노트 전체 내용 모달 ============
+
+async function openNoteModal(sourceId, title) {
+  const modal = document.getElementById('noteModal');
+  const titleEl = document.getElementById('noteModalTitle');
+  const bodyEl = document.getElementById('noteModalBody');
+
+  titleEl.textContent = title || '노트';
+  bodyEl.textContent = '불러오는 중...';
+  modal.classList.remove('hidden');
+
+  try {
+    const res = await fetch(`/api/note-content?sourceId=${sourceId}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `서버 오류 (${res.status})`);
+    titleEl.textContent = data.title || title;
+    bodyEl.textContent = data.content || '(내용 없음)';
+  } catch (err) {
+    bodyEl.textContent = `불러오기 실패: ${err.message}`;
+  }
+}
+
+document.getElementById('noteModalClose').addEventListener('click', () => {
+  document.getElementById('noteModal').classList.add('hidden');
+});
+document.getElementById('noteModal').addEventListener('click', (e) => {
+  if (e.target.id === 'noteModal') e.currentTarget.classList.add('hidden');
+});
+
+// ============ 초기 로드 ============
+
+loadTags();

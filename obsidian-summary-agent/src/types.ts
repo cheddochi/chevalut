@@ -1,8 +1,9 @@
 export interface Env {
+  VAULT_BUCKET: R2Bucket;
   HYPERDRIVE: Hyperdrive;
   AI: Ai;
   ASSETS: Fetcher;
-  VAULT_NOTES_TABLE: string;
+  VAULT_PREFIX: string;
 }
 
 export interface ParsedSentence {
@@ -11,12 +12,11 @@ export interface ParsedSentence {
   category: string;
 }
 
-export interface SourceNote {
-  id: number;
-  path: string;
+export interface VaultNote {
+  path: string; // R2 오브젝트 키
   title: string;
-  content: string;
-  syncedAt: string;
+  content: string; // 프론트매터 제거된 본문
+  syncedAt: string; // R2 오브젝트의 마지막 수정 시각 (ISO)
 }
 
 export interface SentenceRecord {
@@ -26,10 +26,25 @@ export interface SentenceRecord {
   createdAt: string;
   tags: string[];
   source: {
-    type: 'db' | 'manual';
+    id: number;
+    type: 'vault' | 'manual';
     path: string | null;
     title: string;
   };
+}
+
+export interface TagStat {
+  name: string;
+  count: number;
+  related: { name: string; count: number }[];
+}
+
+export interface SourceContent {
+  id: number;
+  type: 'vault' | 'manual';
+  path: string | null;
+  title: string;
+  content: string;
 }
 
 export interface TopologyNode {

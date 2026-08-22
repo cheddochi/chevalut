@@ -1,44 +1,32 @@
 -- Obsidian Summary Agent 스키마
--- 기존 chevault-sync가 쓰는 chevalut2 Postgres에 그대로 추가한다 (별도 DB/저장소 없음).
--- 원본 노트는 이미 있는 notes 테이블을 그대로 읽기 전용으로 쓰고,
--- 이 프로젝트의 분석 결과만 summary_ 접두사 테이블에 저장한다
--- (chevault-sync의 기존 tags 테이블 등과 이름이 겹치지 않도록 접두사를 붙임).
+-- 기존 chevault-sync가 쓰던 chevalut2 Postgres에 그대로 추가한다 (별도 DB/저장소 없음).
+-- 원본 md는 Cloudflare R2 버킷(chevault/vault/...)에만 있고, 이 프로젝트가 다시 저장하지 않는다.
+-- 분석 결과(문장/태그/카테고리)만 summary_ 접두사 테이블에 저장한다.
 --
--- 0. chevault-sync의 notes 테이블 (원본 스키마, 아직 이 DB에 적용된 적이 없어 여기 포함시킴).
---    summary_sources.note_id가 이 테이블을 참조하므로 먼저 존재해야 한다.
---    chevault-sync Worker가 실제로 배포되어 채워 넣기 전까지는 빈 테이블 상태다.
-CREATE TABLE IF NOT EXISTS notes (
-    id              BIGSERIAL PRIMARY KEY,
-    path            TEXT NOT NULL UNIQUE,
-    title           TEXT NOT NULL,
-    category        TEXT NOT NULL,
-    folder_path     TEXT NOT NULL,
-    content         TEXT NOT NULL,
-    frontmatter     JSONB NOT NULL DEFAULT '{}'::jsonb,
-    r2_modified_at  TIMESTAMPTZ,
-    synced_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+-- 참고: 이전 버전에서는 "Postgres notes 테이블에 원본이 미러링되어 있다"고 가정하고
+-- summary_sources.note_id로 그 테이블을 참조했으나, 실제로는 원본이 R2에만 있고
+-- Postgres notes 테이블은 쓰이지 않는 것으로 확인되어 그 의존성을 제거했다.
+-- (예전에 실수로 만들어졌던 notes 테이블 참조/제약은 아래에서 정리한다.)
 
-CREATE INDEX IF NOT EXISTS idx_notes_category ON notes (category);
-CREATE INDEX IF NOT EXISTS idx_notes_folder_path ON notes (folder_path);
-
--- 1. 분석 대상 소스 (DB에서 가져온 노트 1건, 또는 업로드/붙여넣기 1건)
+-- 1. 분석 대상 소스 (R2 볼트에서 가져온 노트 1건, 또는 업로드/붙여넣기 1건)
 CREATE TABLE IF NOT EXISTS summary_sources (
     id                BIGSERIAL PRIMARY KEY,
-    source_type       TEXT NOT NULL CHECK (source_type IN ('db', 'manual')),
-    -- db 소스일 때만 채움: 원본 notes 테이블 행 참조 (해당 노트가 삭제되어도 분석 결과는 남긴다)
-    note_id           BIGINT REFERENCES notes(id) ON DELETE SET NULL,
-    -- db 소스는 notes.path와 동일 (중복 분석 방지용 유니크 키), manual은 NULL
+    source_type       TEXT NOT NULL CHECK (source_type IN ('vault', 'manual')),
+    -- vault 소스는 R2 오브젝트 키(예: vault/01.../회의록.md)와 동일 (중복 분석 방지용 유니크 키), manual은 NULL
     note_path         TEXT UNIQUE,
     note_title        TEXT NOT NULL,
-    -- manual(업로드/붙여넣기) 소스만 원문을 보관. db 소스는 notes.content에 이미 있으므로 NULL.
+    -- manual(업로드/붙여넣기) 소스만 원문을 보관. vault 소스는 R2에 이미 있으므로 NULL.
     raw_content       TEXT,
-    -- db 소스: notes.synced_at 기준값(중복 분석 방지). manual 소스: 분석 실행 시각.
+    -- vault 소스: R2 오브젝트의 마지막 수정 시각(중복 분석 방지 기준). manual 소스: 분석 실행 시각.
     source_synced_at  TIMESTAMPTZ NOT NULL,
     analyzed_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 이전 버전에서 만들어졌던 notes 테이블 참조 컬럼/제약 정리 (있으면 제거, 없으면 무시).
+ALTER TABLE summary_sources DROP COLUMN IF EXISTS note_id;
+ALTER TABLE summary_sources DROP CONSTRAINT IF EXISTS summary_sources_source_type_check;
+ALTER TABLE summary_sources ADD CONSTRAINT summary_sources_source_type_check
+    CHECK (source_type IN ('vault', 'manual'));
 
 CREATE INDEX IF NOT EXISTS idx_summary_sources_type ON summary_sources (source_type);
 

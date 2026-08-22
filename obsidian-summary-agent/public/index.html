@@ -29,14 +29,42 @@
   </nav>
 
   <section id="listView" class="view">
+    <div class="search-box">
+      <input id="tagSearchInput" type="text" placeholder="태그 검색 (예: 회의, 재고, 이직...)" autocomplete="off" />
+      <div id="tagSuggestions" class="suggestions hidden"></div>
+    </div>
+
+    <div id="selectedTagBar" class="selected-tag-bar hidden">
+      <span>선택된 태그:</span>
+      <span id="selectedTagName" class="tag-pill tag-pill-active"></span>
+      <button id="clearTagBtn" class="btn btn-secondary btn-sm">전체 태그로 돌아가기</button>
+    </div>
+
     <p id="listStatus" class="status-text"></p>
-    <div id="sentenceList" class="sentence-list"></div>
+
+    <div id="tagListContainer" class="tag-list"></div>
+    <div id="sentenceList" class="sentence-list hidden"></div>
   </section>
 
   <section id="topologyView" class="view hidden">
+    <div class="topology-toolbar">
+      <button id="zoomInBtn" class="btn btn-secondary btn-sm" title="확대">＋</button>
+      <button id="zoomOutBtn" class="btn btn-secondary btn-sm" title="축소">－</button>
+      <button id="zoomResetBtn" class="btn btn-secondary btn-sm" title="화면에 맞추기">전체 보기</button>
+    </div>
     <svg id="topologySvg"></svg>
     <aside id="topologyDetail" class="topology-detail hidden"></aside>
   </section>
+
+  <div id="noteModal" class="note-modal hidden">
+    <div class="note-modal-content">
+      <div class="note-modal-header">
+        <h3 id="noteModalTitle"></h3>
+        <button id="noteModalClose" class="btn btn-secondary btn-sm">닫기</button>
+      </div>
+      <pre id="noteModalBody" class="note-modal-body"></pre>
+    </div>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
   <script src="/app.js"></script>

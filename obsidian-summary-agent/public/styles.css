@@ -18,6 +18,10 @@
   box-sizing: border-box;
 }
 
+.hidden {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -63,6 +67,12 @@ body {
 }
 .btn-secondary:hover {
   border-color: var(--purple-light);
+}
+
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 12px;
+  border-radius: 7px;
 }
 
 .input-panel {
@@ -196,23 +206,173 @@ body {
   margin-left: auto;
 }
 
+/* --- 검색창 + 자동완성 --- */
+.search-box {
+  position: relative;
+  margin-bottom: 18px;
+}
+
+.search-box input {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  padding: 12px 16px;
+  border-radius: 10px;
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: var(--purple-light);
+}
+
+.suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  z-index: 20;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.suggestions.hidden {
+  display: none;
+}
+
+.suggestion-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 16px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.suggestion-item:hover,
+.suggestion-item.active {
+  background: rgba(124, 58, 237, 0.15);
+}
+
+.suggestion-count {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+/* --- 선택된 태그 바 --- */
+.selected-tag-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.selected-tag-bar.hidden {
+  display: none;
+}
+
+.tag-pill-active {
+  background: var(--purple);
+  color: #fff;
+}
+
+/* --- 태그 목록 (빈도 + 연관 태그) --- */
+.tag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tag-list.hidden {
+  display: none;
+}
+
+.tag-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+
+.tag-row:hover {
+  border-color: var(--purple-light);
+}
+
+.tag-row-name {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--purple-light);
+  min-width: 120px;
+}
+
+.tag-row-count {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg-overlay);
+  padding: 2px 9px;
+  border-radius: 999px;
+}
+
+.tag-row-related {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.tag-row-related .related-chip {
+  font-family: var(--font-mono);
+  background: var(--tag-bg);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
 #topologyView {
   position: relative;
 }
 
+.topology-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  gap: 6px;
+}
+
 #topologySvg {
   width: 100%;
-  height: 640px;
+  height: 720px;
   background: var(--bg-overlay);
   border: 1px solid var(--border);
   border-radius: 12px;
+  cursor: grab;
+}
+
+#topologySvg:active {
+  cursor: grabbing;
 }
 
 .topology-detail {
   position: absolute;
   top: 32px;
   right: 44px;
-  width: 280px;
+  width: 300px;
+  max-height: 640px;
+  overflow-y: auto;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -222,6 +382,33 @@ body {
 
 .topology-detail.hidden {
   display: none;
+}
+
+.topology-detail h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.related-note-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+
+.related-note-item:hover {
+  border-color: var(--purple-light);
 }
 
 .node-sentence {
@@ -237,13 +424,68 @@ body {
 .node-category {
   fill: #38bdf8;
 }
+.node-dim {
+  opacity: 0.15;
+}
 .edge-line {
   stroke: #888;
   stroke-opacity: 0.2;
 }
 .node-label {
   fill: var(--text-muted);
-  font-size: 10px;
+  font-size: 11px;
   font-family: var(--font-sans);
   pointer-events: none;
+}
+
+/* --- 노트 전체 내용 모달 --- */
+.note-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.note-modal.hidden {
+  display: none;
+}
+
+.note-modal-content {
+  width: min(760px, 90vw);
+  max-height: 80vh;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.note-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.note-modal-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.note-modal-body {
+  margin: 0;
+  padding: 20px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.7;
 }

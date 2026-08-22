@@ -1,5 +1,5 @@
 import postgres from 'postgres';
-import type { Env, ParsedSentence, SourceNote, SentenceRecord } from './types';
+import type { Env, ParsedSentence, SentenceRecord, TagStat } from './types';
 
 /** public/schema.sql을 세미콜론 단위로 나눠 순서대로 실행한다 (모든 문이 IF NOT EXISTS라 재실행해도 안전). */
 export async function applySchema(sql: postgres.Sql, schemaSqlText: string): Promise<number> {
@@ -25,32 +25,12 @@ export function openSql(env: Env) {
   });
 }
 
-/** 기존 chevault-sync가 채워 넣는 notes 테이블을 읽기 전용으로 조회한다. */
-export async function fetchSyncedNotes(
-  sql: postgres.Sql,
-  table: string
-): Promise<SourceNote[]> {
-  const rows = await sql`
-    SELECT id, path, title, content, synced_at
-    FROM ${sql(table)}
-    ORDER BY synced_at DESC
-  `;
-
-  return rows.map((r) => ({
-    id: r.id as number,
-    path: r.path as string,
-    title: r.title as string,
-    content: (r.content as string) ?? '',
-    syncedAt: new Date(r.synced_at as string).toISOString(),
-  }));
-}
-
-/** db 소스로 이미 분석된 노트의 path -> 마지막 분석 기준 동기화 시각 맵 (중복 분석 방지용). */
-export async function getAlreadyAnalyzedDbPaths(sql: postgres.Sql): Promise<Map<string, string>> {
+/** vault(R2) 소스로 이미 분석된 노트의 path -> 마지막 분석 기준 동기화 시각 맵 (중복 분석 방지용). */
+export async function getAlreadyAnalyzedVaultPaths(sql: postgres.Sql): Promise<Map<string, string>> {
   const rows = await sql`
     SELECT note_path, source_synced_at
     FROM summary_sources
-    WHERE source_type = 'db' AND note_path IS NOT NULL
+    WHERE source_type = 'vault' AND note_path IS NOT NULL
   `;
 
   const map = new Map<string, string>();
@@ -61,8 +41,7 @@ export async function getAlreadyAnalyzedDbPaths(sql: postgres.Sql): Promise<Map<
 }
 
 export interface SourceInput {
-  sourceType: 'db' | 'manual';
-  noteId: number | null;
+  sourceType: 'vault' | 'manual';
   notePath: string | null;
   noteTitle: string;
   rawContent: string | null;
@@ -87,8 +66,7 @@ export async function upsertSourceAndSentences(
         await tx`DELETE FROM summary_sentences WHERE source_id = ${sourceId}`;
         await tx`
           UPDATE summary_sources
-          SET note_id = ${source.noteId},
-              note_title = ${source.noteTitle},
+          SET note_title = ${source.noteTitle},
               raw_content = ${source.rawContent},
               source_synced_at = ${source.sourceSyncedAt},
               analyzed_at = now()
@@ -97,9 +75,9 @@ export async function upsertSourceAndSentences(
       } else {
         const inserted = await tx`
           INSERT INTO summary_sources (
-            source_type, note_id, note_path, note_title, raw_content, source_synced_at
+            source_type, note_path, note_title, raw_content, source_synced_at
           ) VALUES (
-            ${source.sourceType}, ${source.noteId}, ${source.notePath},
+            ${source.sourceType}, ${source.notePath},
             ${source.noteTitle}, ${source.rawContent}, ${source.sourceSyncedAt}
           )
           RETURNING id
@@ -109,9 +87,9 @@ export async function upsertSourceAndSentences(
     } else {
       const inserted = await tx`
         INSERT INTO summary_sources (
-          source_type, note_id, note_path, note_title, raw_content, source_synced_at
+          source_type, note_path, note_title, raw_content, source_synced_at
         ) VALUES (
-          ${source.sourceType}, NULL, NULL, ${source.noteTitle}, ${source.rawContent}, ${source.sourceSyncedAt}
+          ${source.sourceType}, NULL, ${source.noteTitle}, ${source.rawContent}, ${source.sourceSyncedAt}
         )
         RETURNING id
       `;
@@ -189,19 +167,40 @@ function parsePgTextArray(raw: unknown): string[] {
   return result.map((s) => s.trim()).filter(Boolean);
 }
 
-export async function listSentences(sql: postgres.Sql): Promise<SentenceRecord[]> {
-  const rows = await sql`
-    SELECT
-      s.id, s.text, s.category, s.created_at,
-      src.source_type, src.note_path, src.note_title,
-      COALESCE(array_agg(t.name) FILTER (WHERE t.name IS NOT NULL), '{}') AS tags
-    FROM summary_sentences s
-    JOIN summary_sources src ON src.id = s.source_id
-    LEFT JOIN summary_sentence_tags st ON st.sentence_id = s.id
-    LEFT JOIN summary_tags t ON t.id = st.tag_id
-    GROUP BY s.id, src.source_type, src.note_path, src.note_title
-    ORDER BY s.created_at DESC
-  `;
+export async function listSentences(
+  sql: postgres.Sql,
+  options: { tag?: string } = {}
+): Promise<SentenceRecord[]> {
+  const rows = options.tag
+    ? await sql`
+        SELECT
+          s.id, s.text, s.category, s.created_at,
+          src.id AS source_id, src.source_type, src.note_path, src.note_title,
+          COALESCE(array_agg(t.name) FILTER (WHERE t.name IS NOT NULL), '{}') AS tags
+        FROM summary_sentences s
+        JOIN summary_sources src ON src.id = s.source_id
+        LEFT JOIN summary_sentence_tags st ON st.sentence_id = s.id
+        LEFT JOIN summary_tags t ON t.id = st.tag_id
+        WHERE s.id IN (
+          SELECT st2.sentence_id FROM summary_sentence_tags st2
+          JOIN summary_tags t2 ON t2.id = st2.tag_id
+          WHERE t2.name = ${options.tag}
+        )
+        GROUP BY s.id, src.id, src.source_type, src.note_path, src.note_title
+        ORDER BY s.created_at DESC
+      `
+    : await sql`
+        SELECT
+          s.id, s.text, s.category, s.created_at,
+          src.id AS source_id, src.source_type, src.note_path, src.note_title,
+          COALESCE(array_agg(t.name) FILTER (WHERE t.name IS NOT NULL), '{}') AS tags
+        FROM summary_sentences s
+        JOIN summary_sources src ON src.id = s.source_id
+        LEFT JOIN summary_sentence_tags st ON st.sentence_id = s.id
+        LEFT JOIN summary_tags t ON t.id = st.tag_id
+        GROUP BY s.id, src.id, src.source_type, src.note_path, src.note_title
+        ORDER BY s.created_at DESC
+      `;
 
   return rows.map((row) => ({
     id: row.id as number,
@@ -210,9 +209,69 @@ export async function listSentences(sql: postgres.Sql): Promise<SentenceRecord[]
     createdAt: new Date(row.created_at as string).toISOString(),
     tags: parsePgTextArray(row.tags),
     source: {
-      type: row.source_type as 'db' | 'manual',
+      id: row.source_id as number,
+      type: row.source_type as 'vault' | 'manual',
       path: (row.note_path as string) ?? null,
       title: row.note_title as string,
     },
   }));
+}
+
+/** 태그별 빈도수 + 함께 등장한(1차 연관) 태그 상위 목록. */
+export async function getTagStats(sql: postgres.Sql, relatedLimit = 8): Promise<TagStat[]> {
+  const counts = await sql`
+    SELECT t.name, count(*) AS cnt
+    FROM summary_tags t
+    JOIN summary_sentence_tags st ON st.tag_id = t.id
+    GROUP BY t.name
+    ORDER BY cnt DESC
+  `;
+
+  const related = await sql`
+    SELECT t1.name AS tag, t2.name AS related_tag, count(*) AS cnt
+    FROM summary_sentence_tags st1
+    JOIN summary_sentence_tags st2
+      ON st1.sentence_id = st2.sentence_id AND st1.tag_id <> st2.tag_id
+    JOIN summary_tags t1 ON t1.id = st1.tag_id
+    JOIN summary_tags t2 ON t2.id = st2.tag_id
+    GROUP BY t1.name, t2.name
+    ORDER BY t1.name, cnt DESC
+  `;
+
+  const relatedByTag = new Map<string, { name: string; count: number }[]>();
+  for (const row of related) {
+    const tag = row.tag as string;
+    const list = relatedByTag.get(tag) ?? [];
+    if (list.length < relatedLimit) {
+      list.push({ name: row.related_tag as string, count: Number(row.cnt) });
+    }
+    relatedByTag.set(tag, list);
+  }
+
+  return counts.map((row) => ({
+    name: row.name as string,
+    count: Number(row.cnt),
+    related: relatedByTag.get(row.name as string) ?? [],
+  }));
+}
+
+/** 노트/업로드 원문 전체를 가져온다. vault 소스는 원문이 R2에 있어 별도로 읽어야 하므로 note_path만 반환한다. */
+export async function getSourceMeta(
+  sql: postgres.Sql,
+  sourceId: number
+): Promise<{ type: 'vault' | 'manual'; path: string | null; title: string; rawContent: string | null } | null> {
+  const rows = await sql`
+    SELECT source_type, note_path, note_title, raw_content
+    FROM summary_sources
+    WHERE id = ${sourceId}
+  `;
+  if (rows.length === 0) return null;
+
+  const row = rows[0];
+  return {
+    type: row.source_type as 'vault' | 'manual',
+    path: (row.note_path as string) ?? null,
+    title: row.note_title as string,
+    rawContent: (row.raw_content as string) ?? null,
+  };
 }
