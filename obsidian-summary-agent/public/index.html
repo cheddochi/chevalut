@@ -9,19 +9,11 @@
 <body>
   <header class="topbar">
     <h1>Obsidian Summary Agent</h1>
-    <button id="syncBtn" class="btn btn-primary">동기화된 노트 분석</button>
-  </header>
-
-  <section class="input-panel">
-    <h2>개별 노트 분석</h2>
-    <p class="hint">md 파일을 올리거나 내용을 붙여넣어 즉석에서 분석할 수 있습니다 (보조 경로).</p>
-    <div class="input-row">
-      <input type="file" id="fileInput" accept=".md,text/markdown,text/plain" />
-      <textarea id="pasteInput" placeholder="여기에 md 내용을 붙여넣으세요..."></textarea>
-      <button id="manualBtn" class="btn btn-primary">파싱하기</button>
+    <div class="topbar-actions">
+      <button id="openManualBtn" class="btn btn-secondary">개별 노트 분석</button>
+      <button id="syncBtn" class="btn btn-primary">동기화된 노트 분석</button>
     </div>
-    <p id="manualStatus" class="status-text"></p>
-  </section>
+  </header>
 
   <nav class="view-tabs">
     <button class="tab-btn active" data-view="list">목록 보기</button>
@@ -59,6 +51,24 @@
     <svg id="topologySvg"></svg>
     <aside id="topologyDetail" class="topology-detail hidden"></aside>
   </section>
+
+  <div id="manualModal" class="note-modal hidden">
+    <div class="note-modal-content">
+      <div class="note-modal-header">
+        <h3>개별 노트 분석</h3>
+        <button id="manualModalClose" class="btn btn-secondary btn-sm">닫기</button>
+      </div>
+      <div class="manual-modal-body">
+        <p class="hint">md 파일을 올리거나 내용을 붙여넣어 즉석에서 분석할 수 있습니다 (보조 경로).</p>
+        <div class="input-row">
+          <input type="file" id="fileInput" accept=".md,text/markdown,text/plain" />
+          <textarea id="pasteInput" placeholder="여기에 md 내용을 붙여넣으세요..."></textarea>
+          <button id="manualBtn" class="btn btn-primary">파싱하기</button>
+        </div>
+        <p id="manualStatus" class="status-text"></p>
+      </div>
+    </div>
+  </div>
 
   <div id="noteModal" class="note-modal hidden">
     <div class="note-modal-content">

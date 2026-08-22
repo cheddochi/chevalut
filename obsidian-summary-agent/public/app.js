@@ -517,6 +517,18 @@ document.getElementById('noteModal').addEventListener('click', (e) => {
   if (e.target.id === 'noteModal') e.currentTarget.classList.add('hidden');
 });
 
+// ============ 개별 노트 분석 팝업 ============
+
+document.getElementById('openManualBtn').addEventListener('click', () => {
+  document.getElementById('manualModal').classList.remove('hidden');
+});
+document.getElementById('manualModalClose').addEventListener('click', () => {
+  document.getElementById('manualModal').classList.add('hidden');
+});
+document.getElementById('manualModal').addEventListener('click', (e) => {
+  if (e.target.id === 'manualModal') e.currentTarget.classList.add('hidden');
+});
+
 // ============ 초기 로드 ============
 
 loadTags();

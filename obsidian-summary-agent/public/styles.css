@@ -34,6 +34,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   padding: 20px 32px;
   border-bottom: 1px solid var(--border);
 }
@@ -45,6 +47,12 @@ body {
   margin: 0;
 }
 
+.topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .btn {
   font-family: var(--font-sans);
   font-size: 14px;
@@ -52,6 +60,7 @@ body {
   border-radius: 9px;
   border: none;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .btn-primary {
@@ -75,17 +84,12 @@ body {
   border-radius: 7px;
 }
 
-.input-panel {
-  margin: 24px 32px;
+.manual-modal-body {
   padding: 20px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
 }
 
-.input-panel h2 {
-  font-size: 16px;
-  margin: 0 0 4px;
+.manual-modal-body .status-text {
+  margin: 10px 0 0;
 }
 
 .hint {
@@ -269,6 +273,7 @@ body {
 .selected-tag-bar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 16px;
   font-size: 13px;
@@ -351,7 +356,9 @@ body {
   z-index: 10;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
+  max-width: calc(100% - 24px);
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -506,4 +513,47 @@ body {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.7;
+}
+
+/* --- 모바일 화면 --- */
+@media (max-width: 600px) {
+  .topbar {
+    padding: 16px;
+  }
+
+  .topbar h1 {
+    font-size: 16px;
+  }
+
+  .btn {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+
+  .btn-sm {
+    padding: 4px 9px;
+    font-size: 11px;
+  }
+
+  .view {
+    padding: 16px 16px 32px;
+  }
+
+  .view-tabs {
+    margin: 16px 16px 0;
+  }
+
+  .status-text {
+    margin: 10px 16px 0;
+  }
+
+  .tab-btn {
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+
+  .topology-detail {
+    right: 12px;
+    width: min(260px, calc(100% - 24px));
+  }
 }
